@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ErrorNote, Field, SubmitButton, TextInput } from "@/components/ui";
-import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
+import { getSessionUser, signIn, signUp, storageProblem } from "@/lib/browser-auth";
+import { MIN_PASSWORD_LENGTH, validateCredentials } from "@/lib/validation";
 
 type Mode = "login" | "signup";
-
-type ApiError = { ok: false; error: string; field?: string };
 
 export function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter();
@@ -22,59 +21,46 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  // Already signed in? Go straight to the dashboard.
+  useEffect(() => {
+    if (getSessionUser()) router.replace("/dashboard/");
+  }, [router]);
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
-
     setError(null);
 
-    if (!email.trim()) {
-      setError("Please enter your email address.");
-      return;
-    }
-    if (!password) {
-      setError("Please enter your password.");
-      return;
-    }
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Your password needs to be at least ${MIN_PASSWORD_LENGTH} characters.`);
+    const validationError = validateCredentials(email, password);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setPending(true);
     try {
-      const response = await fetch(`/api/auth/${mode}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-          ...(isSignup && displayName.trim() ? { displayName: displayName.trim() } : {}),
-        }),
-      });
+      const result = isSignup
+        ? await signUp({
+            email,
+            password,
+            ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
+          })
+        : await signIn({ email, password });
 
-      const result = (await response.json().catch(() => null)) as
-        | { ok: true }
-        | ApiError
-        | null;
-
-      if (!response.ok || !result || result.ok !== true) {
-        setError(
-          result && "error" in result && result.error
-            ? result.error
-            : "Something went wrong. Please try again.",
-        );
+      if (!result.ok) {
+        setError(result.error);
         return;
       }
 
-      router.replace("/dashboard");
-      router.refresh();
+      router.replace("/dashboard/");
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("Something went wrong while saving your account in this browser.");
     } finally {
       setPending(false);
     }
   }
+
+  const blocked = storageProblem();
 
   return (
     <section className="rise-in w-full max-w-[430px] rounded-2xl border border-line bg-white p-7 shadow-[0_18px_50px_-30px_rgba(16,20,24,0.35)] sm:p-9">
@@ -83,9 +69,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
       </h1>
       <p className="mt-1.5 text-[14.5px] leading-relaxed text-muted">
         {isSignup
-          ? "Use an email address and a password of 8+ characters."
+          ? `Use an email address and a password of ${MIN_PASSWORD_LENGTH}+ characters.`
           : "Enter the email and password you signed up with."}
       </p>
+
+      {blocked ? (
+        <p className="mt-4 rounded-xl bg-[#fdf3e7] px-3.5 py-3 text-[13.5px] leading-relaxed text-[#8a5a12]">
+          {blocked}
+        </p>
+      ) : null}
 
       <form noValidate onSubmit={handleSubmit} className="mt-6 space-y-4">
         <Field id="email" label="Email address">
@@ -159,10 +151,17 @@ export function AuthForm({ mode }: { mode: Mode }) {
         </div>
       </form>
 
+      {isSignup ? (
+        <p className="mt-5 rounded-xl bg-brand-soft px-3.5 py-3 text-[13px] leading-relaxed text-[#0b4d47]">
+          Accounts are saved in this browser only. Use a throwaway password — not one
+          you use for email, banking or anything else.
+        </p>
+      ) : null}
+
       <p className="mt-6 text-center text-[14px] text-body">
         {isSignup ? "Already have an account? " : "New here? "}
         <Link
-          href={isSignup ? "/login" : "/signup"}
+          href={isSignup ? "/" : "/signup/"}
           className="font-semibold text-brand hover:underline"
         >
           {isSignup ? "Sign in" : "Create an account"}

@@ -1,62 +1,55 @@
-# Deploying to Vercel + Neon
+# Deployment
 
-GitHub Pages cannot host this app: it needs a Node server and a PostgreSQL
-database. Vercel runs the app, Neon hosts the database — both have free tiers.
+The app is a static export, deployed to GitHub Pages by a GitHub Actions
+workflow. No external accounts, secrets or database are needed.
 
-## 1. Create the database (Neon, free)
+- **Live URL:** <https://mrakaza12.github.io/MY-DOMAIN/>
+- **Workflow:** `.github/workflows/deploy-pages.yml`
 
-1. Sign in at <https://console.neon.tech> and choose **New project**.
-2. Pick a region close to your users and create it.
-3. On the project dashboard, open **Connect** and copy the connection string.
-   It looks like:
+## How it works
 
-   ```
-   postgresql://user:password@ep-xxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require
-   ```
+1. A push to `main` (or a manual run) starts the workflow.
+2. `npm ci` then `npm run build` produces the static site in `out/`.
+3. `upload-pages-artifact` packages `out/`, and `deploy-pages` publishes it.
+4. GitHub serves it at the repository's Pages URL.
 
-   Use the **pooled** string (the host contains `-pooler`) — it suits serverless
-   functions. Keep `?sslmode=require` on the end.
+## First-time repository settings
 
-You do not need to create tables by hand: the app creates `users`, `sessions`
-and `login_events` the first time it connects.
+Under **Settings → Pages → Build and deployment**:
 
-## 2. Deploy (Vercel, free)
+- **Source:** *GitHub Actions*
 
-1. Sign in at <https://vercel.com> with GitHub.
-2. **Add New → Project**, import `Mrakaza12/MY-DOMAIN`.
-3. Framework preset: **Next.js**. Root directory: `./`. Leave the build
-   settings untouched.
-4. Open **Environment Variables** and add:
+That's the only setting. The old *Deploy from a branch* mode would try to serve
+the raw repository instead of the built site.
 
-   | Name | Value |
-   | --- | --- |
-   | `DATABASE_URL` | the Neon connection string from step 1 |
-   | `NEXT_PUBLIC_SITE_NAME` | the name you want in the header (optional) |
+## Updating the site
 
-5. Click **Deploy**. The first build takes a minute or two.
+```bash
+git add -A
+git commit -m "…"
+git push origin main
+```
 
-Your app is then live at `https://<project>.vercel.app`. Every push to `main`
-redeploys it.
+Watch progress under the **Actions** tab. The deploy takes about a minute.
 
-## 3. Check it works
+## Changing the address or name
 
-- Open the deployment URL → you should land on **/login**.
-- Create an account at **/signup**, then reload **/dashboard** to confirm the
-  session persists.
-- Sign out, sign back in with the same credentials.
+- **Rename the repo** → update `basePath` in `next.config.ts` to match
+  (`/NEW-NAME`), or set it to `""` if you move to a custom domain.
+- **Custom domain** → set `basePath: ""`, add a `public/CNAME` file containing
+  the domain, and configure DNS as GitHub describes.
+- **Product name** → edit `SITE_NAME` in `src/lib/site.ts`.
 
-If sign-up returns “We couldn't create your account”, check the Vercel
-function logs — the usual cause is a missing or malformed `DATABASE_URL`.
+## Rolling back
 
-## Notes
+Pages keeps the deployment history. **Settings → Environments → github-pages**
+lists previous deployments, any of which can be re-deployed. Alternatively,
+revert the commit on `main` and let the workflow run again.
 
-- **Custom domain:** Vercel → Project → Settings → Domains. Add the domain and
-  point its DNS records at Vercel as instructed there.
-- **GitHub Pages:** the repository root contains a single static `index.html`
-  that introduces the project — GitHub Pages serves that, which is why the URL
-  is no longer a 404. The actual app lives on Vercel; once it is deployed,
-  replace the two GitHub links in `index.html` with your deployment URL if you
-  want the Pages page to point at it.
-- **Going further:** use `npx drizzle-kit generate` + `migrate` if you want
-  versioned migrations instead of the automatic table creation, and move the
-  rate limiter in `src/lib/rate-limit.ts` to Redis for multi-instance accuracy.
+## Limitations to keep in mind
+
+This is a static site, so accounts live in each visitor's browser
+(`localStorage`). There is no server, no shared database and no way to sign in
+from a second device. If you later want real cross-device accounts, the earlier
+Postgres implementation is still in the git history (commit `6142ab1`) and needs
+a Node host such as Vercel plus a database such as Neon.

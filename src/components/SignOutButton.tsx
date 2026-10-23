@@ -3,20 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { signOut } from "@/lib/browser-auth";
+
 export function SignOutButton() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
-  async function handleSignOut() {
+  function handleSignOut() {
     if (pending) return;
     setPending(true);
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      router.replace("/login");
-      router.refresh();
-    } finally {
-      setPending(false);
-    }
+    signOut();
+    router.replace("/");
   }
 
   return (

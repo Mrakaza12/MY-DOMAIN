@@ -1,16 +1,12 @@
-import { desc, eq } from "drizzle-orm";
+"use client";
+
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { SignOutButton } from "@/components/SignOutButton";
 import { Logo, Wordmark } from "@/components/ui";
-import { getSessionUser } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { loginEvents } from "@/lib/schema";
-
-export const dynamic = "force-dynamic";
-
-export const metadata = { title: "Your account" };
+import { getSessionUser, listEvents, type SessionUser, type SignInEvent } from "@/lib/browser-auth";
 
 const outcomeLabels: Record<string, string> = {
   signup: "Account created",
@@ -19,47 +15,55 @@ const outcomeLabels: Record<string, string> = {
   logout: "Signed out",
 };
 
-function formatDate(value: Date): string {
+function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  }).format(value);
+  }).format(new Date(value));
 }
 
-function formatDateTime(value: Date): string {
+function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(value);
+  }).format(new Date(value));
 }
 
-export default async function DashboardPage() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
+export default function DashboardPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [events, setEvents] = useState<SignInEvent[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const database = await db();
-  const events = await database
-    .select({
-      id: loginEvents.id,
-      outcome: loginEvents.outcome,
-      ipAddress: loginEvents.ipAddress,
-      createdAt: loginEvents.createdAt,
-    })
-    .from(loginEvents)
-    .where(eq(loginEvents.userId, user.id))
-    .orderBy(desc(loginEvents.createdAt))
-    .limit(8);
+  useEffect(() => {
+    const current = getSessionUser();
+    if (!current) {
+      router.replace("/");
+      return;
+    }
+    setUser(current);
+    setEvents(listEvents(current.email));
+    setLoading(false);
+  }, [router]);
+
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-[14px] text-muted">
+        Checking your session…
+      </div>
+    );
+  }
 
   const name = user.displayName?.split(" ")[0] || null;
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between px-6 pt-8 sm:px-10">
-        <Link href="/dashboard" className="inline-flex items-center gap-3">
+        <Link href="/dashboard/" className="inline-flex items-center gap-3">
           <Logo />
           <Wordmark />
         </Link>
@@ -79,7 +83,7 @@ export default async function DashboardPage() {
           <dl className="mt-7 grid gap-4 border-t border-line pt-6 sm:grid-cols-2">
             <div>
               <dt className="text-[12.5px] font-medium uppercase tracking-[0.08em] text-muted">
-                Member since
+                Account created
               </dt>
               <dd className="mt-1 text-[15px] text-body">{formatDate(user.createdAt)}</dd>
             </div>
@@ -88,17 +92,20 @@ export default async function DashboardPage() {
                 Password storage
               </dt>
               <dd className="mt-1 text-[15px] text-body">
-                scrypt hash — the plain password is never saved
+                PBKDF2-SHA256, 210,000 iterations — never stored as plain text
               </dd>
             </div>
           </dl>
+
+          <p className="mt-6 rounded-xl bg-brand-soft px-3.5 py-3 text-[13px] leading-relaxed text-[#0b4d47]">
+            This account lives in this browser only. There is no server, so it will not
+            work on another device, and clearing site data removes it.
+          </p>
         </section>
 
         <section className="mt-6 rounded-2xl border border-line bg-white p-7 sm:p-9">
           <h2 className="text-[17px] font-semibold text-ink">Recent sign-in activity</h2>
-          <p className="mt-1 text-[14px] text-muted">
-            Stored server-side in Postgres, alongside your account.
-          </p>
+          <p className="mt-1 text-[14px] text-muted">Kept in this browser for this account.</p>
 
           {events.length === 0 ? (
             <p className="mt-5 rounded-xl bg-canvas px-4 py-5 text-[14px] text-muted">
@@ -114,10 +121,7 @@ export default async function DashboardPage() {
                   <span className="text-[14.5px] font-medium text-body">
                     {outcomeLabels[event.outcome] ?? event.outcome}
                   </span>
-                  <span className="text-[13px] text-muted">
-                    {formatDateTime(event.createdAt)}
-                    {event.ipAddress ? ` · ${event.ipAddress}` : ""}
-                  </span>
+                  <span className="text-[13px] text-muted">{formatDateTime(event.createdAt)}</span>
                 </li>
               ))}
             </ul>
@@ -125,8 +129,9 @@ export default async function DashboardPage() {
         </section>
       </main>
 
-      <footer className="px-6 pb-8 text-center text-[12.5px] text-muted">
-        This is a demo app — no money, payments or financial data are involved.
+      <footer className="px-6 pb-8 text-center text-[12.5px] leading-relaxed text-muted">
+        <p>Keyline is a demo app. No payments, balances or financial data are involved.</p>
+        <p className="mt-1">Accounts are stored in your browser, not on a server.</p>
       </footer>
     </div>
   );
