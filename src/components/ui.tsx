@@ -48,8 +48,8 @@ export function AuthShell({ children }: { children: ReactNode }) {
 
       <footer className="px-6 pb-8 text-center text-[13px] leading-relaxed text-muted">
         <p>
-          {SITE_NAME} is a demo project. Accounts you create here store only the
-          email, a scrypt password hash and sign-in metadata.
+          {SITE_NAME} is a demo app. Accounts are stored in this browser only — nothing
+          is sent to a server, and passwords are hashed before they are saved.
         </p>
         <p className="mt-1">
           <a

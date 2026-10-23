@@ -1,56 +1,63 @@
 # Keyline
 
-A small, honest sign-in app: email + password accounts stored in PostgreSQL,
-sessions in an httpOnly cookie, and a dashboard showing your own sign-in
-activity.
+A small sign-in app, published as a static site on GitHub Pages:
+**<https://mrakaza12.github.io/MY-DOMAIN/>**
 
-> This repository previously contained a look-alike of a well-known payment
-> provider's sign-in screen. That has been removed — it was replaced by this
-> original app with its own branding, which stores accounts you own rather than
-> collecting credentials for an existing service.
+Sign up, sign in, land on a dashboard, sign out. Passwords are salted and
+stretched with PBKDF2-HMAC-SHA256 (210,000 iterations) via WebCrypto before
+anything is written to `localStorage`.
 
-## What it does
+## What is real, and what is not
 
-- **Sign up** — email, optional display name, password (8+ characters).
-  Passwords are salted and hashed with scrypt; the plain password is never stored.
-- **Sign in** — verified against the stored hash with a constant-time compare.
-  A generic “Email or password is incorrect.” avoids leaking which emails exist.
-- **Sessions** — a random 32-byte token in an `httpOnly`, `SameSite=Lax` cookie.
-  Only its SHA-256 hash is stored in the `sessions` table, and it expires after 30 days.
-- **Dashboard** — your email, member-since date and recent sign-in activity,
-  plus sign-out.
-- **Throttling** — ten failed attempts per email/IP per ten minutes.
+| | |
+|---|---|
+| Password hashing | Real — PBKDF2-SHA256, random 16-byte salt per account, constant-time compare |
+| Accounts | Stored in **this browser only** (`localStorage`) — no server |
+| Sessions | 30-day expiry, held in `localStorage` |
+| Throttling | 10 failed attempts per email per 10 minutes, tracked in the browser |
+| Sign-in activity | Local history for the current account |
+
+Because the whole app is static, there is no server to authenticate against.
+An account created in one browser cannot sign in from another, and clearing
+site data deletes it. That is the trade-off for hosting entirely on GitHub
+Pages — **use a throwaway password, never one you use elsewhere.**
+
+## Routes
+
+- `/` — sign in (sends you to the dashboard if a session exists)
+- `/signup/` — create an account
+- `/dashboard/` — session-guarded account page
 
 ## Stack
 
-- Next.js 16 (App Router) + React 19, Tailwind CSS v4
-- PostgreSQL via Drizzle ORM (`src/lib/schema.ts`)
-- Route handlers for every mutation (`src/app/api/auth/*`)
+- Next.js 16 App Router with `output: "export"` (static HTML, no server runtime)
+- React 19 + Tailwind CSS v4
+- WebCrypto PBKDF2 for password hashing
 
-## Run it locally
+## Local development
 
 ```bash
 npm install
-cp .env.example .env.local   # DATABASE_URL can stay empty
-npm run dev
+npm run dev          # http://localhost:3000/MY-DOMAIN/
 ```
 
-With `DATABASE_URL` empty, the app uses **PGlite** — Postgres compiled to
-WebAssembly — and stores data in `./.data/pglite`. No database server needed.
-The tables are created automatically on first request.
+To preview the real static export (what GitHub Pages serves):
 
-To use a real Postgres locally (or Neon, Supabase, RDS…), set `DATABASE_URL` in
-`.env.local` and run `npm run db:push` if you want Drizzle to manage the schema.
+```bash
+npm run build
+npm run preview      # http://localhost:4000/MY-DOMAIN/
+```
 
-## Deploy
+## Deployment
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Mrakaza12/MY-DOMAIN)
+`.github/workflows/deploy-pages.yml` builds the site and publishes `out/` to
+GitHub Pages on every push to `main`. Pages is configured with **Build and
+deployment → Source: GitHub Actions**.
 
-The button creates a Vercel project from this repository. You still need to add
-a `DATABASE_URL` pointing at a Postgres database (Neon has a free tier) before
-the first deploy is usable — see **[DEPLOY.md](./DEPLOY.md)** for the exact steps.
+The `basePath` is `/MY-DOMAIN` in `next.config.ts`. If you rename the
+repository, change that value too.
 
-## Changing the name
+## History
 
-Set `NEXT_PUBLIC_SITE_NAME` (for example in Vercel → Settings → Environment
-Variables) and redeploy — no code changes required.
+An earlier revision of this repository contained a look-alike of a payment
+provider's sign-in screen that stored any typed password. It has been removed.
