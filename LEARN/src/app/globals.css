@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #0070ba;
+  --color-brand-dark: #005c99;
+  --color-brand-soft: #eaf4fb;
+  --color-ink: #001435;
+  --color-body: #2c2e2f;
+  --color-muted: #6b7075;
+  --color-line: #e5e5e5;
+  --color-canvas: #f6f6f4;
+  --font-sans: "Inter", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
+  ::selection {
+    background: #b9dcf5;
+    color: #001435;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+@utility brand-logo {
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.055em;
+  color: #070707;
+}
+
+.ppip-spinner {
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 9999px;
+  height: 20px;
+  width: 20px;
+  animation: ppip-spin 0.7s linear infinite;
+}
+
+.ppip-spinner-dark {
+  border: 2px solid rgba(0, 112, 186, 0.25);
+  border-top-color: var(--color-brand);
+  border-radius: 9999px;
+  height: 20px;
+  width: 20px;
+  animation: ppip-spin 0.7s linear infinite;
+}
+
+@keyframes ppip-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ppip-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ppip-fade-up {
+  animation: ppip-fade-up 0.22s ease-out both;
+}
